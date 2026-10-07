@@ -11,6 +11,7 @@ MCCC007-23 - Computacao Grafica - UFABC
 Executar: python 06_senhor_coracao.py
 Teclas:   SETAS movem o olhar | D alterna dia/noite | ESC sai
 """
+
 import sys
 from pathlib import Path
 
@@ -24,11 +25,13 @@ MAGENTA = (0.85, 0.10, 0.45, 1.0)
 BRANCO_OLHO = (1.0, 1.0, 1.0, 1.0)
 PRETO = (0.05, 0.05, 0.05, 1.0)
 FUNDO_DIA = (0.96, 0.96, 0.94, 1.0)
-FUNDO_NOITE = (0.05, 0.05, 0.12, 1.0)
+FUNDO_NOITE = (0.10, 0.10, 0.17, 1.0)
+FUNDO_DIA_CHUVA = (0.46, 0.46, 0.44, 1.0)
+FUNDO_NOITE_CHUVA = (0.01, 0.01, 0.05, 1.0)
 
 ESCALA_CORPO = 0.62
 ESCALA_OLHO, ESCALA_PUPILA = 0.085, 0.040
-CENTRO_OLHO = (0.17, 0.20)   # afastamento do eixo e altura de cada olho
+CENTRO_OLHO = (0.17, 0.20)  # afastamento do eixo e altura de cada olho
 
 # Ate onde a pupila pode sair do centro do olho, sem escapar do branco.
 LIMITE_OLHAR = ESCALA_OLHO - ESCALA_PUPILA
@@ -40,16 +43,15 @@ def leque(x, y):
     a curva, e o primeiro ponto repetido no fim para fechar a volta."""
     x = np.concatenate(([0.0], x, [x[0]]))
     y = np.concatenate(([0.0], y, [y[0]]))
-    return np.column_stack((x, y, np.zeros_like(x), np.ones_like(x))).astype('f4')
+    return np.column_stack((x, y, np.zeros_like(x), np.ones_like(x))).astype("f4")
 
 
 def curva_coracao(n=180):
     t = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
     x = 16.0 * np.sin(t) ** 3
-    y = (13.0 * np.cos(t) - 5.0 * np.cos(2 * t)
-         - 2.0 * np.cos(3 * t) - np.cos(4 * t))
-    y = y - 0.5 * (y.max() + y.min())      # centra a curva na origem
-    return leque(x / 17.0, y / 17.0)       # normaliza para caber em [-1, 1]
+    y = 13.0 * np.cos(t) - 5.0 * np.cos(2 * t) - 2.0 * np.cos(3 * t) - np.cos(4 * t)
+    y = y - 0.5 * (y.max() + y.min())  # centra a curva na origem
+    return leque(x / 17.0, y / 17.0)  # normaliza para caber em [-1, 1]
 
 
 def curva_circulo(n=48):
@@ -58,12 +60,12 @@ def curva_circulo(n=48):
 
 
 def erro_glfw(codigo, descricao):
-    """Substitui o aviso padrão do pyGLFW: imprime código 
+    """Substitui o aviso padrão do pyGLFW: imprime código
     e descrição de qualquer erro do GLFW em stderr"""
     print(f"GLFW [{codigo}]: {descricao}", file=sys.stderr)
 
 
-glfw.set_error_callback(erro_glfw)   # antes de glfw.init(), de proposito
+glfw.set_error_callback(erro_glfw)  # antes de glfw.init(), de proposito
 
 if not glfw.init():
     sys.exit("FALHA: glfw nao inicializou")
@@ -74,7 +76,7 @@ glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
 glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, glfw.TRUE)
 # Sem a dica acima, o macOS recusa qualquer contexto 3.2+ e
 # create_window devolve None. E inofensiva no Windows e no Linux.
-glfw.window_hint(glfw.SAMPLES, 4)        # quatro amostras por pixel
+glfw.window_hint(glfw.SAMPLES, 4)  # quatro amostras por pixel
 glfw.window_hint(glfw.RESIZABLE, False)  # janela quadrada: ver a nota
 
 janela = glfw.create_window(640, 640, "Senhor Coracao", None, None)
@@ -97,7 +99,7 @@ prog = ctx.program(
 
 def montar(vertices):
     vbo = ctx.buffer(vertices.tobytes())
-    return vbo, ctx.vertex_array(prog, [(vbo, '4f', 'vPosition')])
+    return vbo, ctx.vertex_array(prog, [(vbo, "4f", "vPosition")])
 
 
 vbo_coracao, vao_coracao = montar(curva_coracao())
@@ -106,16 +108,20 @@ vbo_circulo, vao_circulo = montar(curva_circulo())
 # Todo o estado do programa cabe em dois numeros e um booleano.
 olhar_x, olhar_y = 0.0, 0.0
 noite = False
+chuva = False
+atenuacao = 1.0
 
 
 def tecla(window, key, scancode, action, mods):
-    global olhar_x, olhar_y, noite
+    global olhar_x, olhar_y, noite, chuva
     if action != glfw.PRESS and action != glfw.REPEAT:
         return
     if key == glfw.KEY_ESCAPE:
         glfw.set_window_should_close(window, True)
     elif key == glfw.KEY_D:
         noite = not noite
+    elif key == glfw.KEY_C:
+        chuva = not chuva
     elif key in (glfw.KEY_LEFT, glfw.KEY_RIGHT, glfw.KEY_UP, glfw.KEY_DOWN):
         dx = {glfw.KEY_LEFT: -1.0, glfw.KEY_RIGHT: 1.0}.get(key, 0.0)
         dy = {glfw.KEY_DOWN: -1.0, glfw.KEY_UP: 1.0}.get(key, 0.0)
@@ -125,7 +131,7 @@ def tecla(window, key, scancode, action, mods):
         # Limitar cada eixo em separado prende a pupila num quadrado, e na
         # diagonal ela escapa: o centro chega a 0.064 do centro do olho e a
         # borda da pupila a 0.104, contra um raio de 0.085.
-        distancia = (olhar_x ** 2 + olhar_y ** 2) ** 0.5
+        distancia = (olhar_x**2 + olhar_y**2) ** 0.5
         if distancia > LIMITE_OLHAR:
             olhar_x *= LIMITE_OLHAR / distancia
             olhar_y *= LIMITE_OLHAR / distancia
@@ -149,17 +155,33 @@ def ajustar(nome, valor):
 
 def desenhar(vao, escala, deslocamento, cor):
     """Carrega os tres uniformes daquele desenho e dispara a chamada."""
-    ajustar('u_escala', escala)
-    ajustar('u_deslocamento', deslocamento)
-    ajustar('u_cor', cor)
+    ajustar("u_escala", escala)
+    ajustar("u_deslocamento", deslocamento)
+    ajustar("u_cor", cor)
     vao.render(moderngl.TRIANGLE_FAN)
 
 
 while not glfw.window_should_close(janela):
+    if noite and chuva:
+        atenuacao = 0.25
+    elif noite and not chuva:
+        atenuacao = 0.35
+    elif chuva:
+        atenuacao = 0.50
+    else:
+        atenuacao = 1.0
     # Uma escrita por quadro: os cinco desenhos abaixo leem este mesmo valor.
-    ajustar('u_atenuacao', 0.35 if noite else 1.0)
+    ajustar("u_atenuacao", atenuacao)
 
-    ctx.clear(*(FUNDO_NOITE if noite else FUNDO_DIA))
+    fundo = FUNDO_DIA
+    if noite and chuva:
+        fundo = FUNDO_NOITE_CHUVA
+    elif noite and not chuva:
+        fundo = FUNDO_NOITE
+    elif chuva:
+        fundo = FUNDO_DIA_CHUVA
+
+    ctx.clear(*fundo)
 
     desenhar(vao_coracao, ESCALA_CORPO, (0.0, 0.0), MAGENTA)
 
@@ -167,8 +189,12 @@ while not glfw.window_should_close(janela):
     for lado in (-1.0, 1.0):
         centro = (lado * CENTRO_OLHO[0], CENTRO_OLHO[1])
         desenhar(vao_circulo, ESCALA_OLHO, centro, BRANCO_OLHO)
-        desenhar(vao_circulo, ESCALA_PUPILA,
-                 (centro[0] + olhar_x, centro[1] + olhar_y), PRETO)
+        desenhar(
+            vao_circulo,
+            ESCALA_PUPILA,
+            (centro[0] + olhar_x, centro[1] + olhar_y),
+            PRETO,
+        )
 
     glfw.swap_buffers(janela)
     glfw.poll_events()
