@@ -3,13 +3,14 @@ Senhor Coracao: uma geometria desenhada varias vezes.
 
 Duas curvas na VRAM (o coracao e um circulo) e cinco desenhos por quadro. O que
 muda de um desenho para o outro nao esta em nenhum VBO: esta em variaveis
-uniformes. As teclas nao animam nada -- elas trocam o valor de uma uniforme, e
-o desenho seguinte ja sai diferente.
+uniformes. As teclas trocam o valor de uma uniforme.
+
+A chuva é um retangulo que cobre a tela e o fragmento gera linhas verticais a partir de u_tempo.
 
 MCCC007-23 - Computacao Grafica - UFABC
 
 Executar: python 06_senhor_coracao.py
-Teclas:   SETAS movem o olhar | D alterna dia/noite | ESC sai
+Teclas:   SETAS movem o olhar | D alterna dia/noite | C alterna chuva | ESC sai
 """
 
 import sys
@@ -95,17 +96,36 @@ prog = ctx.program(
     vertex_shader=(SHADERS / "senhor_coracao.vert").read_text(encoding="utf-8"),
     fragment_shader=(SHADERS / "senhor_coracao.frag").read_text(encoding="utf-8"),
 )
+prog_chuva = ctx.program(
+    vertex_shader=(SHADERS / "chuva.vert").read_text(encoding="utf-8"),
+    fragment_shader=(SHADERS / "chuva.frag").read_text(encoding="utf-8"),
+)
 
 
-def montar(vertices):
+def montar(vertices, programa=None):
+    programa = prog if programa is None else programa
     vbo = ctx.buffer(vertices.tobytes())
-    return vbo, ctx.vertex_array(prog, [(vbo, "4f", "vPosition")])
+    return vbo, ctx.vertex_array(programa, [(vbo, "4f", "vPosition")])
+
+
+def quad_tela():
+    """Dois triangulos em NDC. A gota nao esta nestes vertices."""
+    cantos = (
+        (-1.0, -1.0),
+        (1.0, -1.0),
+        (1.0, 1.0),
+        (-1.0, -1.0),
+        (1.0, 1.0),
+        (-1.0, 1.0),
+    )
+    return np.array([(x, y, 0.0, 1.0) for x, y in cantos], dtype="f4")
 
 
 vbo_coracao, vao_coracao = montar(curva_coracao())
 vbo_circulo, vao_circulo = montar(curva_circulo())
+vbo_chuva, vao_chuva = montar(quad_tela(), prog_chuva)
 
-# Todo o estado do programa cabe em dois numeros e um booleano.
+# Todo o estado do programa cabe em dois numeros e dois booleanos.
 olhar_x, olhar_y = 0.0, 0.0
 noite = False
 chuva = False
@@ -161,6 +181,15 @@ def desenhar(vao, escala, deslocamento, cor):
     vao.render(moderngl.TRIANGLE_FAN)
 
 
+def desenhar_chuva():
+    """Cobre a cena com as linhas verticais do shader de chuva."""
+    prog_chuva["u_tempo"].value = glfw.get_time()
+    ctx.enable(moderngl.BLEND)
+    ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
+    vao_chuva.render(moderngl.TRIANGLES)
+    ctx.disable(moderngl.BLEND)
+
+
 while not glfw.window_should_close(janela):
     if noite and chuva:
         atenuacao = 0.25
@@ -196,10 +225,22 @@ while not glfw.window_should_close(janela):
             PRETO,
         )
 
+    if chuva:
+        desenhar_chuva()
+
     glfw.swap_buffers(janela)
     glfw.poll_events()
 
-for recurso in (vao_coracao, vao_circulo, vbo_coracao, vbo_circulo, prog):
+for recurso in (
+    vao_coracao,
+    vao_circulo,
+    vao_chuva,
+    vbo_coracao,
+    vbo_circulo,
+    vbo_chuva,
+    prog,
+    prog_chuva,
+):
     recurso.release()
 glfw.terminate()
 print("Execucao finalizada.")
