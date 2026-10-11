@@ -10,6 +10,7 @@ out vec4 v2fcolor;
 
 void main() {
     gl_Position = vec4(vPosition.xy * u_escala + u_deslocamento, vPosition.zw);
+    gl_PointSize = 4.0;
 
     v2fcolor = u_cor;
 }
