@@ -1,7 +1,9 @@
 """
-Senhor Coracao: uma geometria desenhada varias vezes.
+Senhor Coracao num sitio: uma geometria desenhada varias vezes, agora em
+meio a uma cena de sitio (sol/lua, estrelas, chao, arvore, bangalo, vaca e
+galinha), cada objeto em sua propria classe.
 
-Duas curvas na VRAM (o coracao e um circulo) e cinco desenhos por quadro. O que
+Duas curvas na VRAM (o coracao e um circulo) e varios desenhos por quadro. O que
 muda de um desenho para o outro nao esta em nenhum VBO: esta em variaveis
 uniformes. As teclas trocam o valor de uma uniforme.
 
@@ -11,6 +13,8 @@ MCCC007-23 - Computacao Grafica - UFABC
 
 Executar: python 06_senhor_coracao.py
 Teclas:   SETAS movem o olhar | D alterna dia/noite | C alterna chuva | ESC sai
+          1 cicla o telhado do bangalo | 2 cicla as manchas da vaca
+          3 cicla a copa da arvore
 """
 
 import sys
@@ -18,7 +22,15 @@ from pathlib import Path
 
 import glfw
 import moderngl
-import numpy as np
+
+from arvore import Arvore
+from astro import Astro
+from bangalo import Bangalo
+from chao import Chao
+from estrelas import Estrelas
+from galinha import Galinha
+from geometrias import curva_circulo, curva_coracao, quad_tela
+from vaca import Vaca
 
 SHADERS = Path(__file__).parent / "shaders"
 
@@ -37,27 +49,6 @@ CENTRO_OLHO = (0.17, 0.20)  # afastamento do eixo e altura de cada olho
 # Ate onde a pupila pode sair do centro do olho, sem escapar do branco.
 LIMITE_OLHAR = ESCALA_OLHO - ESCALA_PUPILA
 PASSO_OLHAR = LIMITE_OLHAR / 2.0
-
-
-def leque(x, y):
-    """Empacota uma curva fechada como TRIANGLE_FAN: primeiro o centro, depois
-    a curva, e o primeiro ponto repetido no fim para fechar a volta."""
-    x = np.concatenate(([0.0], x, [x[0]]))
-    y = np.concatenate(([0.0], y, [y[0]]))
-    return np.column_stack((x, y, np.zeros_like(x), np.ones_like(x))).astype("f4")
-
-
-def curva_coracao(n=180):
-    t = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
-    x = 16.0 * np.sin(t) ** 3
-    y = 13.0 * np.cos(t) - 5.0 * np.cos(2 * t) - 2.0 * np.cos(3 * t) - np.cos(4 * t)
-    y = y - 0.5 * (y.max() + y.min())  # centra a curva na origem
-    return leque(x / 17.0, y / 17.0)  # normaliza para caber em [-1, 1]
-
-
-def curva_circulo(n=48):
-    t = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
-    return leque(np.cos(t), np.sin(t))
 
 
 def erro_glfw(codigo, descricao):
@@ -108,22 +99,17 @@ def montar(vertices, programa=None):
     return vbo, ctx.vertex_array(programa, [(vbo, "4f", "vPosition")])
 
 
-def quad_tela():
-    """Dois triangulos em NDC. A gota nao esta nestes vertices."""
-    cantos = (
-        (-1.0, -1.0),
-        (1.0, -1.0),
-        (1.0, 1.0),
-        (-1.0, -1.0),
-        (1.0, 1.0),
-        (-1.0, 1.0),
-    )
-    return np.array([(x, y, 0.0, 1.0) for x, y in cantos], dtype="f4")
-
-
 vbo_coracao, vao_coracao = montar(curva_coracao())
 vbo_circulo, vao_circulo = montar(curva_circulo())
 vbo_chuva, vao_chuva = montar(quad_tela(), prog_chuva)
+sol = Astro(ctx, prog, cor=(0.98, 0.80, 0.10, 1.0), posicao=(0.70, 0.70), escala=0.18)
+lua = Astro(ctx, prog, cor=(0.85, 0.87, 0.95, 1.0), posicao=(0.65, 0.68), escala=0.14)
+estrelas = Estrelas(ctx, prog)
+chao = Chao(ctx, prog)
+arvore = Arvore(ctx, prog)
+bangalo = Bangalo(ctx, prog)
+vaca = Vaca(ctx, prog)
+galinha = Galinha(ctx, prog)
 
 # Todo o estado do programa cabe em dois numeros e dois booleanos.
 olhar_x, olhar_y = 0.0, 0.0
@@ -142,6 +128,12 @@ def tecla(window, key, scancode, action, mods):
         noite = not noite
     elif key == glfw.KEY_C:
         chuva = not chuva
+    elif key == glfw.KEY_1:
+        bangalo.ciclar_telhado()
+    elif key == glfw.KEY_2:
+        vaca.ciclar_manchas()
+    elif key == glfw.KEY_3:
+        arvore.ciclar_copa()
     elif key in (glfw.KEY_LEFT, glfw.KEY_RIGHT, glfw.KEY_UP, glfw.KEY_DOWN):
         dx = {glfw.KEY_LEFT: -1.0, glfw.KEY_RIGHT: 1.0}.get(key, 0.0)
         dy = {glfw.KEY_DOWN: -1.0, glfw.KEY_UP: 1.0}.get(key, 0.0)
@@ -212,6 +204,19 @@ while not glfw.window_should_close(janela):
 
     ctx.clear(*fundo)
 
+    # Fundo vivo: estrelas e lua so de noite; sol de dia.
+    if noite:
+        estrelas.desenhar()
+        lua.desenhar()
+    else:
+        sol.desenhar()
+
+    chao.desenhar()
+    arvore.desenhar()
+    bangalo.desenhar()
+    vaca.desenhar()
+    galinha.desenhar()
+
     desenhar(vao_coracao, ESCALA_CORPO, (0.0, 0.0), MAGENTA)
 
     # A mesma geometria de circulo, quatro vezes, so mudando os uniformes.
@@ -231,6 +236,8 @@ while not glfw.window_should_close(janela):
     glfw.swap_buffers(janela)
     glfw.poll_events()
 
+for objeto in (sol, lua, estrelas, chao, arvore, bangalo, vaca, galinha):
+    objeto.liberar()
 for recurso in (
     vao_coracao,
     vao_circulo,
