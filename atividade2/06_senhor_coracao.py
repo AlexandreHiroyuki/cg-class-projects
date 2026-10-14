@@ -12,7 +12,8 @@ A chuva é um retangulo que cobre a tela e o fragmento gera linhas verticais a p
 MCCC007-23 - Computacao Grafica - UFABC
 
 Executar: python 06_senhor_coracao.py
-Teclas:   SETAS movem o olhar | D alterna dia/noite | C alterna chuva | ESC sai
+Teclas:   SETAS movem o olhar | ESQ/DIR andam vaca e galinha
+          D alterna dia/noite | C alterna chuva | ESC sai
           1 cicla o telhado do bangalo | 2 cicla as manchas da vaca
           3 cicla a copa da arvore
 """
@@ -22,7 +23,6 @@ from pathlib import Path
 
 import glfw
 import moderngl
-
 from arvore import Arvore
 from astro import Astro
 from bangalo import Bangalo
@@ -37,9 +37,9 @@ SHADERS = Path(__file__).parent / "shaders"
 MAGENTA = (0.85, 0.10, 0.45, 1.0)
 BRANCO_OLHO = (1.0, 1.0, 1.0, 1.0)
 PRETO = (0.05, 0.05, 0.05, 1.0)
-FUNDO_DIA = (0.96, 0.96, 0.94, 1.0)
+FUNDO_DIA = (0.53, 0.78, 0.95, 1.0)
 FUNDO_NOITE = (0.10, 0.10, 0.17, 1.0)
-FUNDO_DIA_CHUVA = (0.46, 0.46, 0.44, 1.0)
+FUNDO_DIA_CHUVA = (0.18, 0.30, 0.45, 1.0)
 FUNDO_NOITE_CHUVA = (0.01, 0.01, 0.05, 1.0)
 
 ESCALA_CORPO = 0.62
@@ -49,6 +49,8 @@ CENTRO_OLHO = (0.17, 0.20)  # afastamento do eixo e altura de cada olho
 # Ate onde a pupila pode sair do centro do olho, sem escapar do branco.
 LIMITE_OLHAR = ESCALA_OLHO - ESCALA_PUPILA
 PASSO_OLHAR = LIMITE_OLHAR / 2.0
+PASSO_VACA = 0.04
+PASSO_GALINHA = 0.07
 
 
 def erro_glfw(codigo, descricao):
@@ -137,6 +139,9 @@ def tecla(window, key, scancode, action, mods):
     elif key in (glfw.KEY_LEFT, glfw.KEY_RIGHT, glfw.KEY_UP, glfw.KEY_DOWN):
         dx = {glfw.KEY_LEFT: -1.0, glfw.KEY_RIGHT: 1.0}.get(key, 0.0)
         dy = {glfw.KEY_DOWN: -1.0, glfw.KEY_UP: 1.0}.get(key, 0.0)
+        if dx != 0.0:
+            vaca.andar(dx * PASSO_VACA, bangalo.caixa())
+            galinha.andar(dx * PASSO_GALINHA, bangalo.caixa())
         olhar_x += dx * PASSO_OLHAR
         olhar_y += dy * PASSO_OLHAR
         # O branco do olho e um CIRCULO, entao o limite tem de ser no vetor.
@@ -176,6 +181,7 @@ def desenhar(vao, escala, deslocamento, cor):
 def desenhar_chuva():
     """Cobre a cena com as linhas verticais do shader de chuva."""
     prog_chuva["u_tempo"].value = glfw.get_time()
+    prog_chuva["u_atenuacao"].value = atenuacao
     ctx.enable(moderngl.BLEND)
     ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
     vao_chuva.render(moderngl.TRIANGLES)

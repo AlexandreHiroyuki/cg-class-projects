@@ -2,8 +2,26 @@
 manchas circulares que trocam de cor juntas pela tecla 2."""
 
 import moderngl
-
 from geometrias import curva_circulo, curva_elipse, quad
+
+
+def _invade(x, y, local, caixa):
+    lx0, ly0, lx1, ly1 = local
+    cx0, cy0, cx1, cy1 = caixa
+    ax0, ay0 = x + lx0, y + ly0
+    ax1, ay1 = x + lx1, y + ly1
+    return ax0 < cx1 and ax1 > cx0 and ay0 < cy1 and ay1 > cy0
+
+
+def _contornar(origem, novo, y, local, caixa):
+    """Se o passo entra na caixa, encosta no lado de onde o animal veio."""
+    if not _invade(novo, y, local, caixa):
+        return novo
+    lx0, _, lx1, _ = local
+    cx0, _, cx1, _ = caixa
+    if origem + (lx0 + lx1) / 2 < (cx0 + cx1) / 2:
+        return cx0 - lx1
+    return cx1 - lx0
 
 
 class Vaca:
@@ -15,6 +33,8 @@ class Vaca:
         (0.55, 0.55, 0.55, 1.0),  # cinza
     )
     MANCHA = None  # marcador: desenhar() troca por self.cor_manchas
+    CAIXA_COLISAO = (-0.16, 0.0, 0.25, 0.37)
+    LIMITE_X = (-1.0 - CAIXA_COLISAO[0], 1.0 - CAIXA_COLISAO[2])
 
     def __init__(self, ctx, prog):
         """Monta os VAOs das partes em coords locais; cabeca e manchas
@@ -33,17 +53,31 @@ class Vaca:
 
         circulo = novo_vao(curva_circulo())
         self.partes = (
-            (novo_vao(quad(-0.13, 0.0, -0.09, 0.10)), 1.0, (0.0, 0.0),
-             self.BRANCO, moderngl.TRIANGLE_FAN),  # pata traseira
-            (novo_vao(quad(0.07, 0.0, 0.11, 0.10)), 1.0, (0.0, 0.0),
-             self.BRANCO, moderngl.TRIANGLE_FAN),  # pata dianteira
-            (novo_vao(curva_elipse(0.16, 0.11)), 1.0, (0.0, 0.18),
-             self.BRANCO, moderngl.TRIANGLE_FAN),  # corpo
+            (
+                novo_vao(quad(-0.13, 0.0, -0.09, 0.10)),
+                1.0,
+                (0.0, 0.0),
+                self.BRANCO,
+                moderngl.TRIANGLE_FAN,
+            ),  # pata traseira
+            (
+                novo_vao(quad(0.07, 0.0, 0.11, 0.10)),
+                1.0,
+                (0.0, 0.0),
+                self.BRANCO,
+                moderngl.TRIANGLE_FAN,
+            ),  # pata dianteira
+            (
+                novo_vao(curva_elipse(0.16, 0.11)),
+                1.0,
+                (0.0, 0.18),
+                self.BRANCO,
+                moderngl.TRIANGLE_FAN,
+            ),  # corpo
             (circulo, 0.045, (-0.06, 0.20), self.MANCHA, moderngl.TRIANGLE_FAN),
             (circulo, 0.035, (0.05, 0.15), self.MANCHA, moderngl.TRIANGLE_FAN),
             (circulo, 0.040, (0.10, 0.23), self.MANCHA, moderngl.TRIANGLE_FAN),
-            (circulo, 0.07, (0.18, 0.30),
-             self.BEGE, moderngl.TRIANGLE_FAN),  # cabeca
+            (circulo, 0.07, (0.18, 0.30), self.BEGE, moderngl.TRIANGLE_FAN),  # cabeca
         )
 
     def desenhar(self):
@@ -54,6 +88,17 @@ class Vaca:
             self.prog["u_deslocamento"].value = (px + ox, py + oy)
             self.prog["u_cor"].value = cor if cor is not None else self.cor_manchas
             vao.render(modo)
+
+    def andar(self, dx, caixa=None):
+        """Desloca no x, dentro da tela e sem entrar na caixa da casa."""
+        x, y = self.posicao
+        novo = min(max(x + dx, self.LIMITE_X[0]), self.LIMITE_X[1])
+        if caixa is not None:
+            novo = _contornar(x, novo, y, self.CAIXA_COLISAO, caixa)
+            novo = min(max(novo, self.LIMITE_X[0]), self.LIMITE_X[1])
+            if _invade(novo, y, self.CAIXA_COLISAO, caixa):
+                return
+        self.posicao = (novo, y)
 
     def ciclar_manchas(self):
         """Avanca a paleta; a mesma cor vale para todas as manchas juntas."""

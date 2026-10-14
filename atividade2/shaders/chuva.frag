@@ -5,6 +5,7 @@
 
 in vec2 vUv;
 uniform float u_tempo;
+uniform float u_atenuacao;  // 1.0 de dia, menor a noite, como no senhor coracao
 out vec4 outfragcolor;
 
 float camada(vec2 uv, float colunas, float comprimento, float velocidade) {
@@ -18,5 +19,7 @@ void main() {
     float r = camada(vUv, 28.0, 0.12, 0.45);
     r += camada(vUv + vec2(0.2, 0.0), 16.0, 0.24, 0.70);
     r += camada(vUv + vec2(0.5, 0.0), 9.0, 0.40, 1.00);
-    outfragcolor = vec4(0.75, 0.82, 0.92, clamp(r, 0.0, 0.85));
+    // .rgb atenua o brilho; .a continua sendo so a cobertura da linha.
+    vec3 cor = vec3(0.75, 0.82, 0.92) * u_atenuacao;
+    outfragcolor = vec4(cor, clamp(r, 0.0, 0.85));
 }
