@@ -2,7 +2,7 @@
 
 **Disciplina:** MCCC007-23 — Computação Gráfica, UFABC  
 **Programa:** `06_senhor_coracao.py`  
-**Dupla:** Alexandre Hiroyuki (11202230885) e Gabriel Cipriano
+**Dupla:** Alexandre Hiroyuki (11202230885) e Gabriel Cipriano (11202111302)
 
 O programa desenha um sítio em duas dimensões em torno do Sr. Coração. A janela usa OpenGL 4.0 Core, com GLFW e ModernGL. Não há immediate mode, `glBegin` nem matriz embutida: cada desenho é um VAO e os shaders é que posicionam e colorem.
 
