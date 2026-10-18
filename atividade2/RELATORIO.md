@@ -156,8 +156,9 @@ Céu `(0.10, 0.10, 0.17)`, atenuação `0.35`, lua e estrelas no lugar do sol. O
 
 **Alexandre Hiroyuki — relatório**
 
-- Redação deste documento: arquitetura, contrato entre as classes, descrição dos dois shaders e das capturas.
-- Itens 1 a 5 e 10 a 15 do relatório resumido em `README.md`.
+- Redação da arquitetura, do contrato entre as classes, dos dois shaders e das capturas.
+- Descrição da base do Sr. Coração, da flag de chuva, da mudança do tema da noite e dos quatro climas.
+- Descrição da animação da chuva, do céu azul de dia, do céu mais escuro com chuva, da atenuação das linhas, do andar dos animais em velocidades diferentes e da caixa de colisão.
 
 **Gabriel Cipriano — código**
 
@@ -169,7 +170,7 @@ Céu `(0.10, 0.10, 0.17)`, atenuação `0.35`, lua e estrelas no lugar do sol. O
 
 **Gabriel Cipriano — relatório**
 
-- Itens 6 a 9 do relatório resumido em `README.md`, descrevendo o sol reutilizado, a refatoração, a cena do sítio e o ciclo de cores.
+- Descrição do sol reaproveitado a partir do círculo, da organização do código em classes, da cena do sítio e do ciclo de cores do telhado, das manchas da vaca e da copa.
 
 ## 5. Declaração de uso de IA
 
